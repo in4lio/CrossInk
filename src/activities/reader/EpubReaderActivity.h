@@ -21,6 +21,11 @@ class EpubReaderActivity final : public Activity {
   int nextPageNumber = 0;
   int activeSectionFontId = 0;
   bool activeSectionUsesFallbackFont = false;
+  struct SavedPosition {
+    int spineIndex;
+    int pageNumber;
+  };
+  std::optional<SavedPosition> pendingSectionLoadReturnPosition;
   std::optional<uint16_t> pendingPageJump;
   // Set when navigating to a footnote href with a fragment (e.g. #note1).
   // Cleared on the next render after the new section loads and resolves it to a page.
@@ -28,6 +33,12 @@ class EpubReaderActivity final : public Activity {
   int pagesUntilFullRefresh = 0;
   int cachedSpineIndex = 0;
   int cachedChapterTotalPageCount = 0;
+  struct CachedContentAnchor {
+    int spineIndex;
+    uint16_t paragraphIndex;
+    uint16_t pageOffset;
+  };
+  std::optional<CachedContentAnchor> cachedContentAnchor;
   unsigned long lastPageTurnTime = 0UL;
   unsigned long pageTurnDuration = 0UL;
   unsigned long pageShownAtMs = 0UL;
@@ -86,10 +97,6 @@ class EpubReaderActivity final : public Activity {
 
   // Footnote support
   std::vector<FootnoteEntry> currentPageFootnotes;
-  struct SavedPosition {
-    int spineIndex;
-    int pageNumber;
-  };
   static constexpr int MAX_FOOTNOTE_DEPTH = 3;
   SavedPosition savedPositions[MAX_FOOTNOTE_DEPTH] = {};
   int footnoteDepth = 0;
@@ -98,6 +105,10 @@ class EpubReaderActivity final : public Activity {
                       int orientedMarginBottom, int orientedMarginLeft);
   void renderStatusBar() const;
   void silentIndexNextChapterIfNeeded(uint16_t viewportWidth, uint16_t viewportHeight);
+  void rememberPagePosition(int spineIndex, int currentPage, int pageCount);
+  void rememberSectionPosition();
+  void rememberSectionLoadReturnPosition();
+  void clearContentAnchor();
   bool saveProgress(int spineIndex, int currentPage, int pageCount);
   void pauseReadingPaceTimer(const char* reason = "unknown");
   void resumeReadingPaceTimer(const char* reason = "unknown");
