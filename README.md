@@ -1,6 +1,23 @@
-> **This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** with a focus on improved fonts and minimal reading stats.
+> **CrossTinte** is a personal fork of CrossInk, kept close to the original while adding a small layer of reader-focused refinements.
 
-## What's different in this fork
+## What's different in CrossTinte against CrossInk
+
+CrossTinte is meant to feel almost the same as CrossInk. It follows CrossInk releases and keeps the fork changes small so new upstream work can be picked up regularly.
+
+This branch is maintained by rebasing on CrossInk. Its history will be rewritten whenever the fork is refreshed against CrossInk, so use tags or releases for stable builds.
+
+### Highlights
+
+- Added Onest and Sourcerer as optional built-in reader fonts.
+- Added a power button shortcut that can cycle reader font sizes.
+- Improved position keeping when font changes or reader settings relayout an EPUB.
+- Improved recovery when an EPUB chapter cannot be indexed.
+- Uses CrossTinte release, update, and catalog metadata.
+- Keeps simulator support available for local testing.
+
+---
+
+## What's different in CrossInk against CrossPoint
 
 My goal with this fork was to maintain the core Crosspoint firmware while integrating my preferred typography and some lightweight reading statistics. I’ve focused on keeping the underlying system stable while layering in a few "nice-to-have" features and UI refinements along the way.
 
