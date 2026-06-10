@@ -4,6 +4,8 @@ set -e
 
 cd "$(dirname "$0")"
 
+PYTHON_BIN="${PYTHON:-python3}"
+
 EMOJI_FONT="../builtinFonts/source/NotoEmoji/NotoEmoji-Regular.ttf"
 SYMBOLS_FONT="../builtinFonts/source/NotoSymbols/NotoSansSymbols-Regular.ttf"
 PHM_FONT="../builtinFonts/source/NotoSansCJKsc/NotoSansCJKsc-Regular.otf"
@@ -161,21 +163,29 @@ generate_family() {
   local source_dir="$2"
   local source_prefix="$3"
   local output_dir="$4"
-  local include_fallbacks="$5"
-  local use_chareink_common_fallback="$6"
+  local include_emoji="$5"
+  local include_phm="$6"
+  local use_chareink_common_fallback="$7"
 
   for size in ${READING_FONT_SIZES[@]}; do
     for style in ${READING_FONT_STYLES[@]}; do
       local style_lower
       style_lower="$(echo $style | tr '[:upper:]' '[:lower:]')"
       local font_name="${family_name}_${size}_${style_lower}"
-      local font_path="../builtinFonts/source/${source_dir}/${source_prefix}-${style}.ttf"
+      local source_style="$style"
+      if [[ "$family_name" == "onest" ]]; then
+        case "$style" in
+          Italic) source_style="Regular" ;;
+          BoldItalic) source_style="Bold" ;;
+        esac
+      fi
+      local font_path="../builtinFonts/source/${source_dir}/${source_prefix}-${source_style}.ttf"
       local output_path="${output_dir}/${font_name}.h"
       local font_stack=("$font_path")
       local interval_args=()
       local include_args=()
 
-      if [[ "$include_fallbacks" == "yes" ]]; then
+      if [[ "$include_emoji" == "yes" ]]; then
         interval_args+=("${BASE_FALLBACK_INTERVALS[@]}")
         if [[ "$use_chareink_common_fallback" == "yes" ]]; then
           font_stack+=("../builtinFonts/source/ChareInk7/ChareInk7-${style}.ttf")
@@ -185,15 +195,15 @@ generate_family() {
         include_args+=($(font_include_args $(( ${#font_stack[@]} - 1 )) "${EMOJI_FALLBACK_RANGES[@]}"))
         font_stack+=("$SYMBOLS_FONT")
         include_args+=($(font_include_args $(( ${#font_stack[@]} - 1 )) "${SYMBOL_FALLBACK_RANGES[@]}"))
-
-        if [[ "$style" == "Regular" ]]; then
-          interval_args+=("${PHM_INTERVALS[@]}")
-          font_stack+=("$PHM_FONT")
-          include_args+=($(font_include_args $(( ${#font_stack[@]} - 1 )) "${PHM_FALLBACK_RANGES[@]}"))
-        fi
       fi
 
-      python fontconvert.py $font_name $size "${font_stack[@]}" "${interval_args[@]}" "${include_args[@]}" "${READING_FONT_RENDER_ARGS[@]}" > $output_path
+      if [[ "$include_phm" == "yes" && "$style" == "Regular" ]]; then
+        interval_args+=("${PHM_INTERVALS[@]}")
+        font_stack+=("$PHM_FONT")
+        include_args+=($(font_include_args $(( ${#font_stack[@]} - 1 )) "${PHM_FALLBACK_RANGES[@]}"))
+      fi
+
+      "$PYTHON_BIN" fontconvert.py $font_name $size "${font_stack[@]}" "${interval_args[@]}" "${include_args[@]}" "${READING_FONT_RENDER_ARGS[@]}" > $output_path
       echo "Generated $output_path"
     done
   done
@@ -201,14 +211,17 @@ generate_family() {
 
 generate_reading_variant() {
   local output_dir="$1"
-  local include_fallbacks="$2"
-  local label="$3"
+  local include_emoji="$2"
+  local include_phm="$3"
+  local label="$4"
 
   mkdir -p "$output_dir"
   echo "Generating ${label} font variants..."
-  generate_family lexenddeca LexendDeca LexendDeca "$output_dir" "$include_fallbacks" yes
-  generate_family bitter Bitter Bitter "$output_dir" "$include_fallbacks" yes
-  generate_family charein ChareInk7 ChareInk7 "$output_dir" "$include_fallbacks" no
+  generate_family lexenddeca LexendDeca LexendDeca "$output_dir" "$include_emoji" "$include_phm" yes
+  generate_family sourcerer Sourcerer Sourcerer "$output_dir" "$include_emoji" "$include_phm" yes
+  generate_family bitter Bitter Bitter "$output_dir" "$include_emoji" "$include_phm" yes
+  generate_family charein ChareInk7 ChareInk7 "$output_dir" "$include_emoji" "$include_phm" no
+  generate_family onest Onest Onest "$output_dir" "$include_emoji" "$include_phm" yes
   echo ""
   echo "${label} variants complete."
   echo ""
@@ -217,8 +230,10 @@ generate_reading_variant() {
 # Reading font variants:
 #   builtinFonts/             default: emoji/symbol fallback + PHM CJK fallback
 #   builtinFonts/noemoji/     OMIT_EMOJI_FONTS: primary fonts only, no emoji and no PHM CJK
-generate_reading_variant ../builtinFonts yes "default"
-generate_reading_variant ../builtinFonts/noemoji no "no-emoji"
+#   builtinFonts/nophm/       OMIT_PHM only: emoji/symbol fallback, no PHM CJK
+generate_reading_variant ../builtinFonts yes yes "default"
+generate_reading_variant ../builtinFonts/noemoji no no "no-emoji"
+generate_reading_variant ../builtinFonts/nophm yes no "no-PHM"
 
 # UI Font - Inter
 
@@ -231,7 +246,7 @@ for size in ${UI_FONT_SIZES[@]}; do
     font_path="../builtinFonts/source/Inter/Inter-${style}.ttf"
     hebrew_path="../builtinFonts/source/IBMPlexSansHebrew/IBMPlexSansHebrew-${style}.ttf"
     output_path="../builtinFonts/${font_name}.h"
-    python fontconvert.py $font_name $size $font_path $hebrew_path \
+    "$PYTHON_BIN" fontconvert.py $font_name $size $font_path $hebrew_path \
       --additional-intervals 0x05D0,0x05EA > $output_path
     echo "Generated $output_path"
   done
@@ -239,11 +254,11 @@ done
 
 # Small UI Font - Inter
 
-python fontconvert.py inter_8_regular 8 \
+"$PYTHON_BIN" fontconvert.py inter_8_regular 8 \
   ../builtinFonts/source/Inter/Inter-Regular.ttf \
   ../builtinFonts/source/IBMPlexSansHebrew/IBMPlexSansHebrew-Regular.ttf \
   --additional-intervals 0x05D0,0x05EA > ../builtinFonts/inter_8_regular.h
 
 echo ""
 echo "Running compression verification..."
-python verify_compression.py ../builtinFonts/
+"$PYTHON_BIN" verify_compression.py ../builtinFonts/

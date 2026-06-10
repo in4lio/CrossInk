@@ -15,6 +15,7 @@
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
+#include "SdCardFontSystem.h"
 #include "activities/boot_sleep/SleepCoverAssets.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -144,6 +145,9 @@ void TxtReaderActivity::loop() {
   if (executeDarkModePowerButtonAction()) {
     return;
   }
+  if (executeFontSizePowerButtonAction()) {
+    return;
+  }
 
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
@@ -270,6 +274,22 @@ bool TxtReaderActivity::executeDarkModePowerButtonAction() {
 
   if (SETTINGS.longPwrBtn == CrossPointSettings::SHORT_PWRBTN::TOGGLE_DARK_MODE && consumeLongPowerButtonHold()) {
     toggleDarkMode();
+    return true;
+  }
+
+  return false;
+}
+
+bool TxtReaderActivity::executeFontSizePowerButtonAction() {
+  if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::CHANGE_FONT_SIZE &&
+      mappedInput.wasReleased(MappedInputManager::Button::Power) &&
+      mappedInput.getHeldTime() < SETTINGS.getPowerButtonLongPressDuration()) {
+    changeReaderFontSize();
+    return true;
+  }
+
+  if (SETTINGS.longPwrBtn == CrossPointSettings::SHORT_PWRBTN::CHANGE_FONT_SIZE && consumeLongPowerButtonHold()) {
+    changeReaderFontSize();
     return true;
   }
 
@@ -512,6 +532,24 @@ void TxtReaderActivity::renderStatusBar() const {
   }
   GUI.drawStatusBar(renderer, progress, currentPage + 1, totalPages, title, 0, 0, false, nullptr,
                     ReaderUtils::readerDarkModeEnabled());
+}
+
+void TxtReaderActivity::changeReaderFontSize() {
+  bool changed = false;
+  {
+    RenderLock lock(*this);
+    changed = sdFontSystem.changeReaderFontSize(/*larger=*/true);
+    if (changed) {
+      SETTINGS.saveToFile();
+      sdFontSystem.ensureLoaded(renderer);
+      initialized = false;
+      pageOffsets.clear();
+      currentPageLines.clear();
+    }
+  }
+  if (changed) {
+    requestUpdate();
+  }
 }
 
 void TxtReaderActivity::saveProgress() const {

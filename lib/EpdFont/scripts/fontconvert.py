@@ -437,9 +437,13 @@ for cp, fi in cp_to_face_idx.items():
 def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
     """Extract kerning from a PairPos subtable (Format 1 or 2)."""
     if subtable.Format == 1:
+        if not hasattr(subtable, 'PairSet'):
+            return
         # Individual pairs
         for i, coverage_glyph in enumerate(subtable.Coverage.glyphs):
             if coverage_glyph not in glyph_to_cp:
+                continue
+            if i >= len(subtable.PairSet):
                 continue
             pair_set = subtable.PairSet[i]
             for pvr in pair_set.PairValueRecord:
@@ -452,6 +456,8 @@ def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
                     key = (coverage_glyph, pvr.SecondGlyph)
                     raw_kern[key] = raw_kern.get(key, 0) + xa
     elif subtable.Format == 2:
+        if not hasattr(subtable, 'Class1Record'):
+            return
         # Class-based pairs
         class_def1 = subtable.ClassDef1.classDefs if subtable.ClassDef1 else {}
         class_def2 = subtable.ClassDef2.classDefs if subtable.ClassDef2 else {}

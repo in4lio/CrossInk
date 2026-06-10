@@ -19,7 +19,7 @@ hash_files() {
 # When the noemoji/ directory exists, emits an #ifdef OMIT_EMOJI_FONTS block so
 # the correct hash is selected at compile time.
 # Usage: reading_font_id DEFINE_NAME file1 [file2 ...]
-#   Files are relative paths from builtinFonts/ (e.g. ./lexenddeca_10_regular.h).
+#   Files are relative paths from builtinFonts/ (e.g. ./sourcerer_10_regular.h).
 #   Noemoji counterparts are assumed to live at noemoji/<basename>.
 reading_font_id() {
   local name="$1"; shift
@@ -68,6 +68,17 @@ reading_font_id LEXENDDECA_18_FONT_ID \
 reading_font_id LEXENDDECA_20_FONT_ID \
   ./lexenddeca_20_regular.h ./lexenddeca_20_bold.h ./lexenddeca_20_bolditalic.h ./lexenddeca_20_italic.h
 
+reading_font_id SOURCERER_10_FONT_ID \
+  ./sourcerer_10_regular.h ./sourcerer_10_bold.h ./sourcerer_10_bolditalic.h ./sourcerer_10_italic.h
+reading_font_id SOURCERER_12_FONT_ID \
+  ./sourcerer_12_regular.h ./sourcerer_12_bold.h ./sourcerer_12_bolditalic.h ./sourcerer_12_italic.h
+reading_font_id SOURCERER_14_FONT_ID \
+  ./sourcerer_14_regular.h ./sourcerer_14_bold.h ./sourcerer_14_bolditalic.h ./sourcerer_14_italic.h
+reading_font_id SOURCERER_16_FONT_ID \
+  ./sourcerer_16_regular.h ./sourcerer_16_bold.h ./sourcerer_16_bolditalic.h ./sourcerer_16_italic.h
+reading_font_id SOURCERER_18_FONT_ID \
+  ./sourcerer_18_regular.h ./sourcerer_18_bold.h ./sourcerer_18_bolditalic.h ./sourcerer_18_italic.h
+
 reading_font_id CHAREINK_8_FONT_ID \
   ./charein_8_regular.h ./charein_8_bold.h ./charein_8_bolditalic.h ./charein_8_italic.h
 reading_font_id CHAREINK_9_FONT_ID \
@@ -101,6 +112,21 @@ reading_font_id BITTER_18_FONT_ID \
   ./bitter_18_regular.h ./bitter_18_bold.h ./bitter_18_bolditalic.h ./bitter_18_italic.h
 reading_font_id BITTER_20_FONT_ID \
   ./bitter_20_regular.h ./bitter_20_bold.h ./bitter_20_bolditalic.h ./bitter_20_italic.h
+
+reading_font_id ONEST_8_FONT_ID \
+  ./onest_8_regular.h ./onest_8_bold.h ./onest_8_bolditalic.h ./onest_8_italic.h
+reading_font_id ONEST_10_FONT_ID \
+  ./onest_10_regular.h ./onest_10_bold.h ./onest_10_bolditalic.h ./onest_10_italic.h
+reading_font_id ONEST_12_FONT_ID \
+  ./onest_12_regular.h ./onest_12_bold.h ./onest_12_bolditalic.h ./onest_12_italic.h
+reading_font_id ONEST_14_FONT_ID \
+  ./onest_14_regular.h ./onest_14_bold.h ./onest_14_bolditalic.h ./onest_14_italic.h
+reading_font_id ONEST_16_FONT_ID \
+  ./onest_16_regular.h ./onest_16_bold.h ./onest_16_bolditalic.h ./onest_16_italic.h
+reading_font_id ONEST_18_FONT_ID \
+  ./onest_18_regular.h ./onest_18_bold.h ./onest_18_bolditalic.h ./onest_18_italic.h
+reading_font_id ONEST_20_FONT_ID \
+  ./onest_20_regular.h ./onest_20_bold.h ./onest_20_bolditalic.h ./onest_20_italic.h
 
 # UI fonts — no emoji variant
 echo "#define UI_10_FONT_ID ($(hash_files ./inter_10_regular.h ./inter_10_bold.h))"

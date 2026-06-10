@@ -145,8 +145,25 @@ inline uint8_t closestBuiltinFontSizeIndex(const uint8_t targetPointSize) {
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
 // are appended after the built-in fonts. Otherwise only built-in fonts are listed.
 inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
-  // Built-in font labels (StrId)
-  std::vector<StrId> enumValues = {StrId::STR_LEXEND_DECA, StrId::STR_BITTER, StrId::STR_CHAREINK};
+  // Built-in font labels must match CrossPointSettings::FONT_FAMILY after
+  // OMIT_*_FONT_FAMILY flags are applied.
+  std::vector<StrId> enumValues;
+  enumValues.reserve(CrossPointSettings::BUILTIN_FONT_COUNT);
+#ifndef OMIT_LEXENDDECA_FONT_FAMILY
+  enumValues.push_back(StrId::STR_LEXEND_DECA);
+#endif
+#ifndef OMIT_BITTER_FONT_FAMILY
+  enumValues.push_back(StrId::STR_BITTER);
+#endif
+#ifndef OMIT_CHAREINK_FONT_FAMILY
+  enumValues.push_back(StrId::STR_CHAREINK);
+#endif
+#ifndef OMIT_ONEST_FONT_FAMILY
+  enumValues.push_back(StrId::STR_ONEST);
+#endif
+#ifndef OMIT_SOURCERER_FONT_FAMILY
+  enumValues.push_back(StrId::STR_SOURCERER);
+#endif
   // Runtime string labels for SD card fonts
   std::vector<std::string> enumStringValues;
 
@@ -167,9 +184,9 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
   // with all options when SD fonts are present.
   std::vector<std::string> allStringValues;
   if (sdFontCount > 0) {
-    allStringValues.push_back(I18N.get(StrId::STR_LEXEND_DECA));
-    allStringValues.push_back(I18N.get(StrId::STR_BITTER));
-    allStringValues.push_back(I18N.get(StrId::STR_CHAREINK));
+    allStringValues.reserve(enumValues.size() + enumStringValues.size());
+    std::transform(enumValues.begin(), enumValues.end(), std::back_inserter(allStringValues),
+                   [](const StrId id) { return std::string(I18N.get(id)); });
     allStringValues.insert(allStringValues.end(), enumStringValues.begin(), enumStringValues.end());
   }
 
@@ -312,9 +329,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     // --- Reader ---
     // Built-in font-family entry. Replaced per-call with a registry-aware
     // version when SD fonts are installed.
-    add(SettingInfo::Enum(StrId::STR_FONT_FAMILY, &CrossPointSettings::fontFamily,
-                          {StrId::STR_LEXEND_DECA, StrId::STR_BITTER, StrId::STR_CHAREINK}, "fontFamily",
-                          StrId::STR_CAT_READER));
+    add(buildFontFamilySetting(nullptr));
     add(buildBuiltinFontSizeSetting());
     add(SettingInfo::Enum(StrId::STR_SD_FONT_SIZE_RANGE, &CrossPointSettings::sdFontSizeRange,
                           {StrId::STR_FONT_RANGE_TEENSY, StrId::STR_FONT_RANGE_TINY, StrId::STR_FONT_RANGE_XLARGE,
@@ -384,7 +399,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                            StrId::STR_READING_STATS, StrId::STR_MARK_FINISHED, StrId::STR_FORCE_REFRESH,
                            StrId::STR_CHANGE_FONT, StrId::STR_TOGGLE_GUIDE_DOTS, StrId::STR_TOGGLE_BIONIC_READING,
                            StrId::STR_CYCLE_PAGE_TURN, StrId::STR_SYNC_PROGRESS, StrId::STR_FILE_TRANSFER,
-                           StrId::STR_SCREENSHOT_BUTTON, StrId::STR_READER_DARK_MODE, StrId::STR_FOOTNOTES},
+                           StrId::STR_SCREENSHOT_BUTTON, StrId::STR_READER_DARK_MODE, StrId::STR_FOOTNOTES,
+                           StrId::STR_CHANGE_FONT_SIZE},
                           "shortPwrBtn", StrId::STR_CAT_CONTROLS)
             .withEnumRawValues({CrossPointSettings::IGNORE, CrossPointSettings::SLEEP, CrossPointSettings::PAGE_TURN,
                                 CrossPointSettings::TOGGLE_BOOKMARK, CrossPointSettings::READING_STATS,
@@ -393,13 +409,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                 CrossPointSettings::TOGGLE_BIONIC_READING, CrossPointSettings::CYCLE_PAGE_TURN,
                                 CrossPointSettings::SYNC_PROGRESS, CrossPointSettings::FILE_TRANSFER,
                                 CrossPointSettings::SCREENSHOT, CrossPointSettings::TOGGLE_DARK_MODE,
-                                CrossPointSettings::FOOTNOTES}));
+                                CrossPointSettings::FOOTNOTES, CrossPointSettings::CHANGE_FONT_SIZE}));
     add(SettingInfo::Enum(StrId::STR_LONG_PRESS_ACTION, &CrossPointSettings::longPwrBtn,
                           {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_BOOKMARK,
                            StrId::STR_READING_STATS, StrId::STR_MARK_FINISHED, StrId::STR_FORCE_REFRESH,
                            StrId::STR_CHANGE_FONT, StrId::STR_TOGGLE_GUIDE_DOTS, StrId::STR_TOGGLE_BIONIC_READING,
                            StrId::STR_CYCLE_PAGE_TURN, StrId::STR_SYNC_PROGRESS, StrId::STR_FILE_TRANSFER,
-                           StrId::STR_SCREENSHOT_BUTTON, StrId::STR_READER_DARK_MODE, StrId::STR_FOOTNOTES},
+                           StrId::STR_SCREENSHOT_BUTTON, StrId::STR_READER_DARK_MODE, StrId::STR_FOOTNOTES,
+                           StrId::STR_CHANGE_FONT_SIZE},
                           "longPwrBtn", StrId::STR_CAT_CONTROLS)
             .withEnumRawValues({CrossPointSettings::IGNORE, CrossPointSettings::SLEEP, CrossPointSettings::PAGE_TURN,
                                 CrossPointSettings::TOGGLE_BOOKMARK, CrossPointSettings::READING_STATS,
@@ -408,7 +425,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                 CrossPointSettings::TOGGLE_BIONIC_READING, CrossPointSettings::CYCLE_PAGE_TURN,
                                 CrossPointSettings::SYNC_PROGRESS, CrossPointSettings::FILE_TRANSFER,
                                 CrossPointSettings::SCREENSHOT, CrossPointSettings::TOGGLE_DARK_MODE,
-                                CrossPointSettings::FOOTNOTES}));
+                                CrossPointSettings::FOOTNOTES, CrossPointSettings::CHANGE_FONT_SIZE}));
     add(SettingInfo::Enum(
             StrId::STR_LONG_PRESS_MENU_ACTION, &CrossPointSettings::longPressMenuAction,
             {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_TOGGLE_BOOKMARK, StrId::STR_READING_STATS,

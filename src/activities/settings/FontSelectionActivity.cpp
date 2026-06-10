@@ -75,9 +75,21 @@ void FontSelectionActivity::onEnter() {
   fonts_.clear();
   fonts_.reserve(CrossPointSettings::BUILTIN_FONT_COUNT + (registry_ ? registry_->getFamilyCount() : 0));
 
-  fonts_.push_back({I18N.get(StrId::STR_LEXEND_DECA), true, 0});
-  fonts_.push_back({I18N.get(StrId::STR_BITTER), true, 1});
-  fonts_.push_back({I18N.get(StrId::STR_CHAREINK), true, 2});
+#ifndef OMIT_LEXENDDECA_FONT_FAMILY
+  fonts_.push_back({I18N.get(StrId::STR_LEXEND_DECA), true, CrossPointSettings::LEXENDDECA});
+#endif
+#ifndef OMIT_BITTER_FONT_FAMILY
+  fonts_.push_back({I18N.get(StrId::STR_BITTER), true, CrossPointSettings::BITTER});
+#endif
+#ifndef OMIT_CHAREINK_FONT_FAMILY
+  fonts_.push_back({I18N.get(StrId::STR_CHAREINK), true, CrossPointSettings::CHAREINK});
+#endif
+#ifndef OMIT_ONEST_FONT_FAMILY
+  fonts_.push_back({I18N.get(StrId::STR_ONEST), true, CrossPointSettings::ONEST});
+#endif
+#ifndef OMIT_SOURCERER_FONT_FAMILY
+  fonts_.push_back({I18N.get(StrId::STR_SOURCERER), true, CrossPointSettings::SOURCERER});
+#endif
 
   if (registry_) {
     const auto& families = registry_->getFamilies();

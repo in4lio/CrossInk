@@ -1977,6 +1977,11 @@ bool EpubReaderActivity::executeShortPowerButtonAction() {
     case CrossPointSettings::SHORT_PWRBTN::FILE_TRANSFER:
       executeReaderQuickAction(CrossPointSettings::LONG_MENU_FILE_TRANSFER);
       return true;
+    case CrossPointSettings::SHORT_PWRBTN::CHANGE_FONT_SIZE:
+      if (sdFontSystem.changeReaderFontSize(/*larger=*/true)) {
+        reindexCurrentSection();
+      }
+      return true;
     case CrossPointSettings::SHORT_PWRBTN::TOGGLE_TILT_PAGE_TURN:
       executeReaderQuickAction(CrossPointSettings::LONG_MENU_TOGGLE_TILT_PAGE_TURN);
       return true;
@@ -2045,6 +2050,11 @@ bool EpubReaderActivity::executeLongPowerButtonAction() {
       return true;
     case CrossPointSettings::SHORT_PWRBTN::FILE_TRANSFER:
       executeReaderQuickAction(CrossPointSettings::LONG_MENU_FILE_TRANSFER);
+      return true;
+    case CrossPointSettings::SHORT_PWRBTN::CHANGE_FONT_SIZE:
+      if (sdFontSystem.changeReaderFontSize(/*larger=*/true)) {
+        reindexCurrentSection();
+      }
       return true;
     case CrossPointSettings::SHORT_PWRBTN::TOGGLE_TILT_PAGE_TURN:
       executeReaderQuickAction(CrossPointSettings::LONG_MENU_TOGGLE_TILT_PAGE_TURN);
