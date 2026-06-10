@@ -146,6 +146,9 @@ void TxtReaderActivity::loop() {
   if (executePowerButtonAction()) {
     return;
   }
+  if (executeFontSizePowerButtonAction()) {
+    return;
+  }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Back) && longPressBackHandled) {
     longPressBackHandled = false;
@@ -321,6 +324,22 @@ bool TxtReaderActivity::executePowerButtonAction() {
   }
 
   if (executeAction(longPowerAction)) {
+    return true;
+  }
+
+  return false;
+}
+
+bool TxtReaderActivity::executeFontSizePowerButtonAction() {
+  if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::CHANGE_FONT_SIZE &&
+      mappedInput.wasReleased(MappedInputManager::Button::Power) &&
+      mappedInput.getHeldTime() < SETTINGS.getPowerButtonLongPressDuration()) {
+    changeReaderFontSize();
+    return true;
+  }
+
+  if (SETTINGS.longPwrBtn == CrossPointSettings::SHORT_PWRBTN::CHANGE_FONT_SIZE && consumeLongPowerButtonHold()) {
+    changeReaderFontSize();
     return true;
   }
 
@@ -595,6 +614,24 @@ void TxtReaderActivity::renderStatusBar() const {
   }
   GUI.drawStatusBar(renderer, progress, currentPage + 1, totalPages, title, 0, 0, false, nullptr,
                     ReaderUtils::readerDarkModeEnabled());
+}
+
+void TxtReaderActivity::changeReaderFontSize() {
+  bool changed = false;
+  {
+    RenderLock lock(*this);
+    changed = sdFontSystem.changeReaderFontSize(/*larger=*/true);
+    if (changed) {
+      SETTINGS.saveToFile();
+      sdFontSystem.ensureLoaded(renderer);
+      initialized = false;
+      pageOffsets.clear();
+      currentPageLines.clear();
+    }
+  }
+  if (changed) {
+    requestUpdate();
+  }
 }
 
 void TxtReaderActivity::saveProgress() const {
