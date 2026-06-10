@@ -36,7 +36,7 @@ def normalize_version(version):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Generate CrossInk release catalog JSON.')
+    parser = argparse.ArgumentParser(description='Generate CrossTinte release catalog JSON.')
     parser.add_argument(
         '--firmware',
         required=True,
@@ -78,7 +78,7 @@ def main():
     args = parse_args()
     version = normalize_version(args.version)
     supported_devices = args.supported_devices or ['x4', 'x3']
-    notes = args.notes or f'CrossInk {version} {args.channel} firmware'
+    notes = args.notes or f'CrossTinte {version} {args.channel} firmware'
 
     releases = []
     seen_variants = set()
