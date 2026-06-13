@@ -2,7 +2,7 @@ name: Deploy Pages
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
     paths:
       - "docs/**"
       - ".github/workflows/pages.yml"
