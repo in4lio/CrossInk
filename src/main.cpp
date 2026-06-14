@@ -495,13 +495,13 @@ constexpr uint32_t SILENT_REBOOT_MAGIC = 0xC1EAB007;
 constexpr uint32_t SILENT_REBOOT_TARGET_HOME = 0;
 constexpr uint32_t SILENT_REBOOT_TARGET_READER = 1;
 
-// How the device is coming back to life, resolved once at boot. Both resume
-// flows suppress the splash and leave the panel holding its pre-boot frame; a
-// plain boot shows the splash. See setup() for the resolution.
+// How the device is coming back to life, resolved once at boot. Resume flows
+// suppress the splash and leave the panel holding its pre-boot frame; a plain
+// boot shows the splash. See setup() for the resolution.
 enum class BootResume : uint8_t {
-  Splash,       // cold boot, flash, panic, or plain reboot
-  Silent,       // heap-defrag ESP.restart() (RTC flag; lost on power loss)
-  QuickResume,  // wake from a quick-resume deep sleep (SD flag; survives power loss)
+  Splash,     // cold boot, flash, panic, or plain reboot
+  Silent,     // heap-defrag ESP.restart() (RTC flag; lost on power loss)
+  SleepWake,  // wake from deep sleep (SD flag; survives power loss)
 };
 
 // Latched true once enterDeepSleep() commits to sleeping, before it tears down
@@ -736,7 +736,10 @@ void enterDeepSleep(bool fromTimeout) {
       SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
       (fromTimeout &&
        SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
-  APP_STATE.showBootScreen = !isQuickResumeSleep;
+  // Deep sleep already looks like power-off electrically, but waking through
+  // the boot splash makes a normal sleep feel like a user-visible reboot. Keep
+  // the retained sleep frame visible until Home/Reader paints instead.
+  APP_STATE.showBootScreen = false;
 
   APP_STATE.saveToFile();
 
@@ -748,6 +751,7 @@ void enterDeepSleep(bool fromTimeout) {
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
   } else {
+    Storage.remove(SLEEP_FRAME_FILE);
     delay(POST_SLEEP_SCREEN_SETTLE_MS);
   }
 
@@ -1029,7 +1033,7 @@ void setup() {
   // HalDisplay::begin), so the first paint is FAST_REFRESH (~500ms) over the
   // retained frame and input dispatches against a visible UI.
   const BootResume resume = isSilentReboot              ? BootResume::Silent
-                            : !APP_STATE.showBootScreen ? BootResume::QuickResume
+                            : !APP_STATE.showBootScreen ? BootResume::SleepWake
                                                         : BootResume::Splash;
 
   setupDisplayAndFonts(resume != BootResume::Splash);
@@ -1039,10 +1043,10 @@ void setup() {
       // Splash skipped: the routing block below picks the target activity; the
       // panel keeps showing the pre-reboot popup until that first paint lands.
       break;
-    case BootResume::QuickResume:
-      // One-shot flag: re-arm the splash for the next non-quick-resume boot. Save
-      // before any painting so a hang in the blocking paint path can't strand
-      // us in a quick-resume-with-no-frame loop on the next boot.
+    case BootResume::SleepWake:
+      // One-shot flag: re-arm the splash for the next regular boot. Save before
+      // any painting so a hang in the blocking paint path can't strand us in a
+      // sleep-wake-with-no-frame loop on the next boot.
       APP_STATE.showBootScreen = true;
       APP_STATE.saveToFile();
       if (loadSleepFrameBuffer()) {
@@ -1056,7 +1060,7 @@ void setup() {
         }
         renderer.displayBuffer(HalDisplay::HALF_REFRESH);
       } else {
-        activityManager.goToBoot();  // frame file missing, fall back to the splash
+        LOG_DBG("BOOT", "No sleep frame file; preserving retained sleep screen until first app paint");
       }
       break;
     case BootResume::Splash:
@@ -1093,12 +1097,11 @@ void setup() {
     activityManager.goToReader(path);
   }
 
-  if (resume == BootResume::Silent) {
+  if (resume == BootResume::Silent || resume == BootResume::SleepWake) {
     // Block until the first paint physically completes. refreshDisplay()
-    // waits on the panel BUSY pin so when this returns the user can see the
-    // new activity. Without the wait, an edge captured by gpio.update()
-    // during boot dispatches against an invisible Home and the default
-    // selectorIndex=0 opens the most-recent book.
+    // waits on the panel BUSY pin so when this returns the user can see the new
+    // activity. Without the wait, a held/released button captured by
+    // gpio.update() during boot may dispatch against an invisible Home/Reader.
     activityManager.requestUpdateAndWait();
     // Absorb any button held at this point into currentState as a non-edge:
     // two gpio.update() calls separated by > InputManager's 5ms debounce
