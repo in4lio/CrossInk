@@ -2136,6 +2136,7 @@ void EpubReaderActivity::loop() {
         {
           RenderLock lock(*this);
           nextPageNumber = 0;
+          rememberSectionLoadReturnPosition();
           currentSpineIndex = nextLongPressed ? currentSpineIndex + 1 : currentSpineIndex - 1;
           section.reset();
         }
@@ -2212,6 +2213,7 @@ void EpubReaderActivity::loop() {
     {
       RenderLock lock(*this);
       nextPageNumber = 0;
+      rememberSectionLoadReturnPosition();
       if (nextTriggered) {
         currentSpineIndex++;
       } else if (currentSpineIndex > 0) {
@@ -3474,6 +3476,7 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
       // We don't want to delete the section mid-render, so grab the semaphore
       {
         RenderLock lock(*this);
+        rememberSectionLoadReturnPosition();
         nextPageNumber = 0;
         currentSpineIndex++;
         section.reset();
@@ -3495,6 +3498,7 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
       // We don't want to delete the section mid-render, so grab the semaphore
       {
         RenderLock lock(*this);
+        rememberSectionLoadReturnPosition();
         nextPageNumber = 0;
         pendingPageJump = std::numeric_limits<uint16_t>::max();
         currentSpineIndex--;
@@ -3526,6 +3530,29 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     GUI.drawPopup(renderer, tr(STR_EPUB_LAYOUT_MEMORY_TITLE));
   };
 
+  const auto recoverFromSectionLoadFailure = [this]() {
+    if (!pendingSectionLoadReturnPosition.has_value()) {
+      return false;
+    }
+
+    const auto returnPosition = *pendingSectionLoadReturnPosition;
+    pendingSectionLoadReturnPosition.reset();
+    LOG_ERR("ERS", "Section load failed; returning to spine=%d page=%d", returnPosition.spineIndex,
+            returnPosition.pageNumber);
+    currentSpineIndex = returnPosition.spineIndex;
+    nextPageNumber = returnPosition.pageNumber;
+    pendingPageJump.reset();
+    pendingPercentJump = false;
+    pendingAnchor.clear();
+    pendingFootnotePreviewAnchor.clear();
+    activeFootnotePreview = false;
+    section.reset();
+    automaticPageTurnActive = false;
+    GUI.drawPopup(renderer, tr(STR_PAGE_LOAD_ERROR));
+    requestUpdate();
+    return true;
+  };
+
   // edge case handling for sub-zero spine index
   if (currentSpineIndex < 0) {
     currentSpineIndex = 0;
@@ -3537,6 +3564,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
   // Show end of book screen
   if (currentSpineIndex == epub->getSpineItemsCount()) {
+    pendingSectionLoadReturnPosition.reset();
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_END_OF_BOOK), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
@@ -3669,6 +3697,9 @@ void EpubReaderActivity::render(RenderLock&& lock) {
           pendingFootnotePreviewAnchor.clear();
           activeFootnotePreview = false;
         }
+        if (recoverFromSectionLoadFailure()) {
+          return;
+        }
         if (layoutAbortedForLowMemory) {
           showLowMemoryLayoutError();
         } else {
@@ -3717,10 +3748,12 @@ void EpubReaderActivity::render(RenderLock&& lock) {
 
     if (!section) {
       LOG_ERR("ERS", "Section load/build did not produce a section");
+      if (recoverFromSectionLoadFailure()) {
+        return;
+      }
       showPendingSyncSaveError();
       return;
     }
-
     if (pendingPageJump.has_value()) {
       if (*pendingPageJump >= section->pageCount && section->pageCount > 0) {
         section->currentPage = section->pageCount - 1;
@@ -3764,15 +3797,26 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       pendingFootnotePreviewAnchor.clear();
     }
 
-    // handles changes in reader settings and reset to approximate position based on cached progress
+    // Handles reader-setting relayouts. Prefer a paragraph anchor plus offset so repeated
+    // font-size changes do not accumulate page-ratio rounding drift.
     if (cachedChapterTotalPageCount > 0) {
       if (currentSpineIndex == cachedSpineIndex) {
         bool restoredFromParagraph = false;
         if (cachedPageParagraphIndex != UINT16_MAX) {
           if (const auto paragraphPage = section->getPageForParagraphIndex(cachedPageParagraphIndex)) {
-            section->currentPage = *paragraphPage;
+            int targetPage = *paragraphPage;
+            int paragraphSpan = std::max(1, static_cast<int>(section->pageCount) - targetPage);
+            if (cachedPageParagraphIndex < std::numeric_limits<uint16_t>::max()) {
+              if (const auto nextParagraphPage = section->getPageForParagraphIndex(cachedPageParagraphIndex + 1)) {
+                paragraphSpan = std::max(1, static_cast<int>(*nextParagraphPage) - targetPage);
+              }
+            }
+
+            const int pageOffset = std::min<int>(cachedPageParagraphOffset, paragraphSpan - 1);
+            section->currentPage = std::clamp(targetPage + pageOffset, 0, static_cast<int>(section->pageCount) - 1);
             restoredFromParagraph = true;
-            LOG_DBG("ERS", "Resolved cached paragraph %u to page %u", cachedPageParagraphIndex, *paragraphPage);
+            LOG_DBG("ERS", "Resolved cached paragraph %u offset %u to page %d", cachedPageParagraphIndex,
+                    cachedPageParagraphOffset, section->currentPage);
           } else {
             LOG_DBG("ERS", "Cached paragraph %u not found; using saved chapter progress", cachedPageParagraphIndex);
           }
@@ -3787,6 +3831,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       cachedChapterPageNumber = 0;
       cachedChapterTotalPageCount = 0;  // resets to 0 to prevent reading cached progress again
       cachedPageParagraphIndex = UINT16_MAX;
+      cachedPageParagraphOffset = 0;
     }
 
     if (pendingPercentJump && section->pageCount > 0) {
@@ -3864,6 +3909,9 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       }
 
       LOG_ERR("ERS", "Failed to load page from SD after %d retries", pageLoadRetryCount);
+      if (recoverFromSectionLoadFailure()) {
+        return;
+      }
       renderer.clearScreen(ReaderUtils::readerBackgroundColor());
       renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), ReaderUtils::readerForegroundBlack(),
                                 EpdFontFamily::BOLD);
@@ -3875,6 +3923,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     }
 
     pageLoadRetryCount = 0;
+    pendingSectionLoadReturnPosition.reset();
 
     // Preview pages are transient note windows, not full chapter pages with reusable footnote metadata.
     if (activeFootnotePreview) {
@@ -4050,13 +4099,38 @@ void EpubReaderActivity::cacheCurrentSectionPosition() {
   cachedChapterPageNumber = section->currentPage;
   cachedChapterTotalPageCount = section->pageCount;
   cachedPageParagraphIndex = UINT16_MAX;
+  cachedPageParagraphOffset = 0;
   nextPageNumber = section->currentPage;
 
   if (section->currentPage >= 0 && section->currentPage < section->pageCount) {
-    if (const auto pIdx = section->getParagraphIndexForPage(static_cast<uint16_t>(section->currentPage))) {
+    const uint16_t anchorPage =
+        section->currentPage > 0 ? static_cast<uint16_t>(section->currentPage - 1) : static_cast<uint16_t>(0);
+    if (const auto pIdx = section->getParagraphIndexForPage(anchorPage)) {
       cachedPageParagraphIndex = *pIdx;
+      int paragraphPage = anchorPage;
+      if (const auto page = section->getPageForParagraphIndex(*pIdx)) {
+        paragraphPage = *page;
+      }
+
+      int paragraphSpan = std::max(1, static_cast<int>(section->pageCount) - paragraphPage);
+      if (*pIdx < std::numeric_limits<uint16_t>::max()) {
+        if (const auto nextParagraphPage = section->getPageForParagraphIndex(*pIdx + 1)) {
+          paragraphSpan = std::max(1, static_cast<int>(*nextParagraphPage) - paragraphPage);
+        }
+      }
+
+      cachedPageParagraphOffset =
+          static_cast<uint16_t>(std::clamp(section->currentPage - paragraphPage, 0, paragraphSpan - 1));
     }
   }
+}
+
+void EpubReaderActivity::rememberSectionLoadReturnPosition() {
+  if (activeFootnotePreview || !section) {
+    return;
+  }
+
+  pendingSectionLoadReturnPosition = SavedPosition{currentSpineIndex, section->currentPage};
 }
 
 void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fontId, const int orientedMarginTop,
@@ -4439,6 +4513,7 @@ std::string EpubReaderActivity::footnotePreviewCacheSuffix(const EpubRenderMode 
 void EpubReaderActivity::clearFootnotePreviewState() {
   pendingFootnotePreviewAnchor.clear();
   activeFootnotePreview = false;
+  pendingSectionLoadReturnPosition.reset();
 }
 
 void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool savePosition) {
