@@ -45,9 +45,11 @@ class TxtReaderActivity final : public Activity {
   void saveProgress() const;
   void loadProgress();
   void toggleDarkMode();
+  void changeReaderFontSize();
   bool consumeLongPowerButtonRelease();
   bool consumeLongPowerButtonHold();
   bool executePowerButtonAction();
+  bool executeFontSizePowerButtonAction();
   bool executeLongPressBackAction();
 
  public:
