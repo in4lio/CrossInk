@@ -391,6 +391,7 @@ bool selectRandomSleepImage(SleepImageMode mode, SleepImageSelection& selection)
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
+  RenderLock sleepRenderLock(*this);
 
   const bool renderQuickResume =
       SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
