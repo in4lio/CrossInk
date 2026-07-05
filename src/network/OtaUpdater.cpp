@@ -23,7 +23,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback, void*, s
 
 namespace {
 #ifndef CROSSINK_OTA_RELEASE_URL
-#define CROSSINK_OTA_RELEASE_URL "https://api.github.com/repos/uxjulia/CrossInk/releases/latest"
+#define CROSSINK_OTA_RELEASE_URL "https://api.github.com/repos/in4lio/CrossTinte/releases/latest"
 #endif
 
 constexpr char latestReleaseUrl[] = CROSSINK_OTA_RELEASE_URL;
@@ -46,6 +46,7 @@ constexpr uint8_t OTA_MAX_REDIRECTS = 5;
 
 struct ParsedVersion {
   int segments[VERSION_SEGMENT_COUNT] = {0, 0, 0, 0};
+  int forkRevision = 0;
   bool valid = false;
   bool releaseCandidate = false;
 };
@@ -91,6 +92,14 @@ ParsedVersion parseVersion(const char* version) {
     ++p;
   }
 
+  if (p[0] == '-' && (p[1] == 't' || p[1] == 'T') && isDigit(p[2])) {
+    p += 2;
+    while (isDigit(*p)) {
+      parsed.forkRevision = parsed.forkRevision * 10 + (*p - '0');
+      ++p;
+    }
+  }
+
   parsed.valid = true;
   parsed.releaseCandidate = containsRcMarker(version);
   return parsed;
@@ -105,6 +114,10 @@ int compareVersions(const char* latestVersion, const char* currentVersion) {
     if (latest.segments[i] != current.segments[i]) {
       return latest.segments[i] > current.segments[i] ? 1 : -1;
     }
+  }
+
+  if (latest.forkRevision != current.forkRevision) {
+    return latest.forkRevision > current.forkRevision ? 1 : -1;
   }
 
   if (current.releaseCandidate && !latest.releaseCandidate) return 1;
@@ -255,7 +268,7 @@ extern esp_err_t esp_crt_bundle_attach(void* conf);
 }
 
 esp_err_t http_client_set_header_cb(esp_http_client_handle_t http_client) {
-  return esp_http_client_set_header(http_client, "User-Agent", "CrossInk-ESP32-" CROSSINK_VERSION);
+  return esp_http_client_set_header(http_client, "User-Agent", "CrossTinte-ESP32-" CROSSINK_VERSION);
 }
 
 size_t totalBytesReceived = 0;
@@ -345,7 +358,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
     return INTERNAL_UPDATE_ERROR;
   }
 
-  esp_err = esp_http_client_set_header(client_handle, "User-Agent", "CrossInk-ESP32-" CROSSINK_VERSION);
+  esp_err = esp_http_client_set_header(client_handle, "User-Agent", "CrossTinte-ESP32-" CROSSINK_VERSION);
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_set_header Failed : %s", esp_err_to_name(esp_err));
     esp_http_client_cleanup(client_handle);
